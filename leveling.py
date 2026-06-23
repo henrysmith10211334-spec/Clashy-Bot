@@ -4,14 +4,13 @@ import random
 import discord
 from discord import app_commands
 
-import db
-from branding import EMBED_COLOR, BOT_NAME
-
 XP_MIN = 15
 XP_MAX = 25
 XP_COOLDOWN_SECONDS = 60
 
 FOOTER_TEXT = f"Leveling System • {BOT_NAME}"
+EMBED_COLOR = discord.Color(0xDDA731)  # matches the reference embed's gold accent
+BOT_NAME = "Clashy's Bot"
 
 # Optional: if unset, level-up messages post in whatever channel the
 # triggering message was sent in.
