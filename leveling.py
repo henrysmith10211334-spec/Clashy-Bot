@@ -1,9 +1,3 @@
-"""
-Messages-only leveling system. Gives random XP per message (with a cooldown
-so spamming doesn't farm levels), announces level-ups, and provides
-/rank and /leaderboard slash commands.
-"""
-
 import os
 import time
 import random
@@ -11,10 +5,13 @@ import discord
 from discord import app_commands
 
 import db
+from branding import EMBED_COLOR, BOT_NAME
 
 XP_MIN = 15
 XP_MAX = 25
 XP_COOLDOWN_SECONDS = 60
+
+FOOTER_TEXT = f"Leveling System • {BOT_NAME}"
 
 # Optional: if unset, level-up messages post in whatever channel the
 # triggering message was sent in.
@@ -24,6 +21,15 @@ LEVEL_UP_CHANNEL_ID = os.environ.get("LEVEL_UP_CHANNEL_ID")
 def xp_for_level(level):
     """Total cumulative XP required to REACH this level."""
     return 5 * (level ** 2) + 50 * level + 100
+
+
+def build_progress_bar(current, total, length=14):
+    if total <= 0:
+        filled = length
+    else:
+        filled = int(length * current / total)
+    filled = max(0, min(filled, length))
+    return "█" * filled + "░" * (length - filled)
 
 
 async def handle_message_xp(message: discord.Message, bot):
@@ -75,9 +81,14 @@ async def handle_message_xp(message: discord.Message, bot):
             override = bot.get_channel(int(LEVEL_UP_CHANNEL_ID))
             if override:
                 target_channel = override
-        await target_channel.send(
-            f"🎉 {message.author.mention} just reached **Level {level}**!"
+
+        embed = discord.Embed(
+            description=f"{message.author.mention} just reached **Level {level}**! 🎉",
+            color=EMBED_COLOR,
         )
+        embed.set_thumbnail(url=message.author.display_avatar.url)
+        embed.set_footer(text=FOOTER_TEXT)
+        await target_channel.send(embed=embed)
 
 
 def setup_leveling_commands(bot):
@@ -91,17 +102,27 @@ def setup_leveling_commands(bot):
         row = cur.fetchone()
         conn.close()
 
-        if row is None:
-            await interaction.response.send_message(
-                f"{member.display_name} hasn't earned any XP yet."
-            )
-            return
+        xp, level = (row["xp"], row["level"]) if row else (0, 0)
 
-        xp, level = row["xp"], row["level"]
-        next_threshold = xp_for_level(level + 1)
-        await interaction.response.send_message(
-            f"**{member.display_name}** — Level {level} ({xp}/{next_threshold} XP)"
+        level_floor = xp_for_level(level)
+        level_ceiling = xp_for_level(level + 1)
+        progress_in_level = xp - level_floor
+        needed_for_level = level_ceiling - level_floor
+        bar = build_progress_bar(progress_in_level, needed_for_level)
+
+        embed = discord.Embed(color=EMBED_COLOR)
+        embed.set_author(name=f"{member.display_name}'s Rank", icon_url=member.display_avatar.url)
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="Level", value=f"**{level}**", inline=True)
+        embed.add_field(name="Total XP", value=f"**{xp}**", inline=True)
+        embed.add_field(
+            name="Progress to next level",
+            value=f"`{bar}`\n{progress_in_level}/{needed_for_level} XP",
+            inline=False,
         )
+        embed.set_footer(text=FOOTER_TEXT)
+
+        await interaction.response.send_message(embed=embed)
 
     @bot.tree.command(name="leaderboard", description="Show the server's XP leaderboard")
     async def leaderboard(interaction: discord.Interaction):
@@ -111,12 +132,21 @@ def setup_leveling_commands(bot):
         rows = cur.fetchall()
         conn.close()
 
-        if not rows:
-            await interaction.response.send_message("No one has earned XP yet.")
-            return
+        embed = discord.Embed(title="🏆 XP Leaderboard", color=EMBED_COLOR)
 
-        lines = [
-            f"**#{i}** <@{row['user_id']}> — Level {row['level']} ({row['xp']} XP)"
-            for i, row in enumerate(rows, start=1)
-        ]
-        await interaction.response.send_message("\n".join(lines))
+        if not rows:
+            embed.description = "No one has earned XP yet."
+        else:
+            medals = ["🥇", "🥈", "🥉"]
+            lines = []
+            for i, row in enumerate(rows):
+                rank_label = medals[i] if i < 3 else f"**#{i + 1}**"
+                lines.append(
+                    f"{rank_label} <@{row['user_id']}> — Level {row['level']} ({row['xp']} XP)"
+                )
+            embed.description = "\n".join(lines)
+
+        embed.set_footer(text=FOOTER_TEXT)
+        await interaction.response.send_message(embed=embed)
+PYEOF
+echo "Done."
