@@ -91,7 +91,7 @@ async def announce_new_video(entry):
  
     video_url = entry.link
     video_id = entry.get("yt_videoid") or extract_video_id(video_url)
-    thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg" if video_id else None
+    thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if video_id else None
  
     embed = discord.Embed(
         description=(
@@ -232,7 +232,7 @@ async def check_for_live_stream():
             ),
             color=discord.Color.from_rgb(255, 0, 0),
         )
-        embed.set_image(url=f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg")
+        embed.set_image(url=f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg")
         embed.set_footer(text=FOOTER_TEXT)
         await channel.send(embed=embed)
         await channel.send(content=PING_MESSAGE)
