@@ -65,6 +65,19 @@ def save_live_state(state):
 live_state = load_live_state()
  
  
+# ---------- branding / display config ----------
+# Hardcoded on purpose — never pulled from the YouTube feed's author field,
+# so it always says exactly this regardless of what the channel is named.
+CREATOR_NAME = os.environ.get("CREATOR_NAME", "Clashy VR")
+EMBED_COLOR = discord.Color(0xDDA731)  # matches the reference embed's gold accent
+FOOTER_TEXT = "Youtube System • Clashy's Bot"
+ 
+ 
+def extract_video_id(url):
+    match = re.search(r"(?:v=|/)([\w-]{11})(?:&|$)", url)
+    return match.group(1) if match else None
+ 
+ 
 # ---------- announcing a new video (shared by webhook + backup poll) ----------
  
 async def announce_new_video(entry):
@@ -74,20 +87,21 @@ async def announce_new_video(entry):
         return False
  
     video_url = entry.link
-    title = entry.title
-    author = entry.get("author", "")
-    thumbnail_url = entry.media_thumbnail[0]["url"] if entry.get("media_thumbnail") else None
+    video_id = entry.get("yt_videoid") or extract_video_id(video_url)
+    thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg" if video_id else None
  
     embed = discord.Embed(
-        title=title,
-        url=video_url,
-        description=f"New video from **{author}**!" if author else "New video!",
-        color=discord.Color.red(),
+        description=(
+            f"**{CREATOR_NAME}** has posted a new video\n\n"
+            f"[Jump to Clashy's new video!]({video_url})"
+        ),
+        color=EMBED_COLOR,
     )
     if thumbnail_url:
         embed.set_image(url=thumbnail_url)
+    embed.set_footer(text=FOOTER_TEXT)
  
-    await channel.send(content=f"📹 New video is up! {video_url}", embed=embed)
+    await channel.send(embed=embed)
     return True
  
  
@@ -208,13 +222,15 @@ async def check_for_live_stream():
     if currently_live and not live_state["is_live"]:
         video_url = f"https://www.youtube.com/watch?v={video_id}"
         embed = discord.Embed(
-            title=title,
-            url=video_url,
-            description="🔴 **LIVE NOW**",
+            description=(
+                f"**{CREATOR_NAME}** is now live\n\n"
+                f"[Jump to Clashy's live stream!]({video_url})"
+            ),
             color=discord.Color.from_rgb(255, 0, 0),
         )
         embed.set_image(url=f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg")
-        await channel.send(content=f"🔴 **Going live right now!** {video_url}", embed=embed)
+        embed.set_footer(text=FOOTER_TEXT)
+        await channel.send(embed=embed)
  
         live_state = {"is_live": True, "video_id": video_id}
         save_live_state(live_state)
