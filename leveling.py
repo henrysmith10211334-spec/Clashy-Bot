@@ -8,7 +8,7 @@ XP_MIN = 15
 XP_MAX = 25
 XP_COOLDOWN_SECONDS = 60
 
-FOOTER_TEXT = f"Leveling System • {BOT_NAME}"
+FOOTER_TEXT = f"Leveling System • Clashy's Bot"
 EMBED_COLOR = discord.Color(0xDDA731)  # matches the reference embed's gold accent
 BOT_NAME = "Clashy's Bot"
 
