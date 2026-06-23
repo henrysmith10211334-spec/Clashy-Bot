@@ -232,5 +232,3 @@ def setup_invite_commands(bot):
         embed = discord.Embed(description="✅ All invite counts have been reset to **0**.", color=EMBED_COLOR)
         embed.set_footer(text=FOOTER_TEXT)
         await interaction.response.send_message(embed=embed)
-PYEOF
-echo "Done."
