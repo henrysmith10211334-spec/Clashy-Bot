@@ -22,7 +22,7 @@ LIVE_CHECK_INTERVAL_MINUTES = int(os.environ.get("LIVE_CHECK_INTERVAL_MINUTES", 
 RESUBSCRIBE_INTERVAL_HOURS = int(os.environ.get("RESUBSCRIBE_INTERVAL_HOURS", "96"))  # ~4 days; lease is 5
  
 PING_ROLE_ID = os.environ.get("PING_ROLE_ID", "here")
-PING_MESSAGE = f"-------- <@{PING_ROLE_ID}> --------"
+PING_MESSAGE = f"-------- @{PING_ROLE_ID} --------"
  
 SEEN_FILE = "seen_videos.json"
 LIVE_STATE_FILE = "live_state.json"
