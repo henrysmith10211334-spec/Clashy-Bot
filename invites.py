@@ -1,21 +1,12 @@
-"""
-Invite tracker. Caches each guild's invite use-counts, and on member join
-compares the new counts to find which invite was used (and therefore who
-invited them). Logs it to LOG_CHANNEL_ID and tracks totals per inviter.
-
-Requires:
-- The bot to have the "Manage Server" permission (to read invite use counts)
-- "Server Members Intent" enabled in the Discord Developer Portal (for
-  on_member_join to fire at all)
-"""
-
 import os
 import discord
 from discord import app_commands
 
 import db
+from branding import EMBED_COLOR, BOT_NAME
 
 LOG_CHANNEL_ID = int(os.environ["LOG_CHANNEL_ID"])
+FOOTER_TEXT = f"Invite System • {BOT_NAME}"
 
 # guild_id -> {invite_code: uses}
 _invite_cache = {}
@@ -62,6 +53,10 @@ async def handle_member_join(member: discord.Member, bot):
         print("Could not find LOG_CHANNEL_ID channel — check the env var and bot permissions.")
         return
 
+    embed = discord.Embed(color=EMBED_COLOR)
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=FOOTER_TEXT)
+
     if inviter:
         conn = db.get_connection()
         cur = conn.cursor()
@@ -77,13 +72,17 @@ async def handle_member_join(member: discord.Member, bot):
         total = cur.fetchone()["invite_count"]
         conn.close()
 
-        await log_channel.send(
-            f"📥 {member.mention} joined — invited by **{inviter.mention}** (now {total} invites)"
+        embed.description = (
+            f"📥 {member.mention} joined\n\n"
+            f"Invited by **{inviter.mention}** — now **{total}** invites"
         )
     else:
-        await log_channel.send(
-            f"📥 {member.mention} joined — inviter unknown (vanity URL or expired invite)"
+        embed.description = (
+            f"📥 {member.mention} joined\n\n"
+            f"Inviter unknown (vanity URL or expired invite)"
         )
+
+    await log_channel.send(embed=embed)
 
 
 def setup_invite_commands(bot):
@@ -98,9 +97,14 @@ def setup_invite_commands(bot):
         conn.close()
 
         count = row["invite_count"] if row else 0
-        await interaction.response.send_message(
-            f"**{member.display_name}** has invited **{count}** member(s)."
-        )
+
+        embed = discord.Embed(color=EMBED_COLOR)
+        embed.set_author(name=f"{member.display_name}'s Invites", icon_url=member.display_avatar.url)
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="Total Invites", value=f"**{count}**")
+        embed.set_footer(text=FOOTER_TEXT)
+
+        await interaction.response.send_message(embed=embed)
 
     @bot.tree.command(name="invite-leaderboard", description="Show the server's top inviters")
     async def invite_leaderboard(interaction: discord.Interaction):
@@ -110,29 +114,40 @@ def setup_invite_commands(bot):
         rows = cur.fetchall()
         conn.close()
 
-        if not rows:
-            await interaction.response.send_message("No invites tracked yet.")
-            return
+        embed = discord.Embed(title="📨 Invite Leaderboard", color=EMBED_COLOR)
 
-        lines = [
-            f"**#{i}** <@{row['user_id']}> — {row['invite_count']} invites"
-            for i, row in enumerate(rows, start=1)
-        ]
-        await interaction.response.send_message("\n".join(lines))
+        if not rows:
+            embed.description = "No invites tracked yet."
+        else:
+            medals = ["🥇", "🥈", "🥉"]
+            lines = []
+            for i, row in enumerate(rows):
+                rank_label = medals[i] if i < 3 else f"**#{i + 1}**"
+                lines.append(f"{rank_label} <@{row['user_id']}> — {row['invite_count']} invites")
+            embed.description = "\n".join(lines)
+
+        embed.set_footer(text=FOOTER_TEXT)
+        await interaction.response.send_message(embed=embed)
 
     # ---------- admin-only adjustments ----------
 
     def _is_admin(interaction: discord.Interaction) -> bool:
         return interaction.user.guild_permissions.manage_guild
 
+    def _admin_denied_embed():
+        embed = discord.Embed(
+            description="🚫 You need the **Manage Server** permission to use this.",
+            color=EMBED_COLOR,
+        )
+        embed.set_footer(text=FOOTER_TEXT)
+        return embed
+
     @bot.tree.command(name="invites-add", description="[Admin] Add or remove invites from a member's total")
     @app_commands.describe(member="Who to adjust", amount="Amount to add (negative number to subtract)")
     @app_commands.default_permissions(manage_guild=True)
     async def invites_add(interaction: discord.Interaction, member: discord.Member, amount: int):
         if not _is_admin(interaction):
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+            await interaction.response.send_message(embed=_admin_denied_embed(), ephemeral=True)
             return
 
         conn = db.get_connection()
@@ -149,18 +164,23 @@ def setup_invite_commands(bot):
         total = cur.fetchone()["invite_count"]
         conn.close()
 
-        await interaction.response.send_message(
-            f"Adjusted **{member.display_name}**'s invites by {amount:+d} — now **{total}** total."
+        embed = discord.Embed(
+            description=(
+                f"✅ Adjusted **{member.display_name}**'s invites by **{amount:+d}**\n"
+                f"Now **{total}** total."
+            ),
+            color=EMBED_COLOR,
         )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text=FOOTER_TEXT)
+        await interaction.response.send_message(embed=embed)
 
     @bot.tree.command(name="invites-reset", description="[Admin] Reset one member's invite count to 0")
     @app_commands.describe(member="Who to reset")
     @app_commands.default_permissions(manage_guild=True)
     async def invites_reset(interaction: discord.Interaction, member: discord.Member):
         if not _is_admin(interaction):
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+            await interaction.response.send_message(embed=_admin_denied_embed(), ephemeral=True)
             return
 
         conn = db.get_connection()
@@ -175,23 +195,32 @@ def setup_invite_commands(bot):
         conn.commit()
         conn.close()
 
-        await interaction.response.send_message(f"Reset **{member.display_name}**'s invites to 0.")
+        embed = discord.Embed(
+            description=f"✅ Reset **{member.display_name}**'s invites to **0**.",
+            color=EMBED_COLOR,
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.set_footer(text=FOOTER_TEXT)
+        await interaction.response.send_message(embed=embed)
 
     @bot.tree.command(name="invites-reset-all", description="[Admin] Reset EVERYONE's invite count to 0")
     @app_commands.describe(confirm="Set to True to actually do this (safety check)")
     @app_commands.default_permissions(manage_guild=True)
     async def invites_reset_all(interaction: discord.Interaction, confirm: bool = False):
         if not _is_admin(interaction):
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+            await interaction.response.send_message(embed=_admin_denied_embed(), ephemeral=True)
             return
 
         if not confirm:
-            await interaction.response.send_message(
-                "This resets **everyone's** invite count to 0. Run again with `confirm: True` to proceed.",
-                ephemeral=True,
+            embed = discord.Embed(
+                description=(
+                    "⚠️ This will reset **everyone's** invite count to 0.\n"
+                    "Run again with `confirm: True` to proceed."
+                ),
+                color=EMBED_COLOR,
             )
+            embed.set_footer(text=FOOTER_TEXT)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         conn = db.get_connection()
@@ -200,4 +229,8 @@ def setup_invite_commands(bot):
         conn.commit()
         conn.close()
 
-        await interaction.response.send_message("✅ All invite counts have been reset to 0.")
+        embed = discord.Embed(description="✅ All invite counts have been reset to **0**.", color=EMBED_COLOR)
+        embed.set_footer(text=FOOTER_TEXT)
+        await interaction.response.send_message(embed=embed)
+PYEOF
+echo "Done."
