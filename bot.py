@@ -21,6 +21,9 @@ CHECK_INTERVAL_MINUTES = int(os.environ.get("CHECK_INTERVAL_MINUTES", "15"))
 LIVE_CHECK_INTERVAL_MINUTES = int(os.environ.get("LIVE_CHECK_INTERVAL_MINUTES", "2"))
 RESUBSCRIBE_INTERVAL_HOURS = int(os.environ.get("RESUBSCRIBE_INTERVAL_HOURS", "96"))  # ~4 days; lease is 5
  
+PING_ROLE_ID = os.environ.get("PING_ROLE_ID", "1518806702886223932")
+PING_MESSAGE = f"-------- <@&{PING_ROLE_ID}> --------"
+ 
 SEEN_FILE = "seen_videos.json"
 LIVE_STATE_FILE = "live_state.json"
 FEED_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={YOUTUBE_CHANNEL_ID}"
@@ -102,6 +105,7 @@ async def announce_new_video(entry):
     embed.set_footer(text=FOOTER_TEXT)
  
     await channel.send(embed=embed)
+    await channel.send(content=PING_MESSAGE)
     return True
  
  
@@ -231,6 +235,7 @@ async def check_for_live_stream():
         embed.set_image(url=f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg")
         embed.set_footer(text=FOOTER_TEXT)
         await channel.send(embed=embed)
+        await channel.send(content=PING_MESSAGE)
  
         live_state = {"is_live": True, "video_id": video_id}
         save_live_state(live_state)
