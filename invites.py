@@ -1,12 +1,14 @@
 import os
 import discord
 from discord import app_commands
-
 import db
-from branding import EMBED_COLOR, BOT_NAME
+
 
 LOG_CHANNEL_ID = int(os.environ["LOG_CHANNEL_ID"])
-FOOTER_TEXT = f"Invite System • {BOT_NAME}"
+FOOTER_TEXT = f"Invite System • Clashy's Bot"
+EMBED_COLOR = discord.Color(0xDDA731)  # matches the reference embed's gold accent
+BOT_NAME = "Clashy's Bot"
+
 
 # guild_id -> {invite_code: uses}
 _invite_cache = {}
