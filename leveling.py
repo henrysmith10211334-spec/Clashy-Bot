@@ -148,5 +148,3 @@ def setup_leveling_commands(bot):
 
         embed.set_footer(text=FOOTER_TEXT)
         await interaction.response.send_message(embed=embed)
-PYEOF
-echo "Done."
