@@ -1,0 +1,4 @@
+discord.py>=2.3.2
+feedparser>=6.0.10
+aiohttp>=3.9.0
+Pillow>=10.0.0
