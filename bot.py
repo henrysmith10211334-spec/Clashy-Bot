@@ -17,15 +17,15 @@ PORT = int(os.environ.get("PORT", "8080"))
 GUILD_ID = os.environ.get("GUILD_ID")
 
 intents = discord.Intents.default()
-intents.members = True  # needed for invite tracking
+intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
-# Attach other systems
+# Attach leveling + invite systems
 leveling.setup_leveling_commands(bot)
 invites.setup_invite_commands(bot)
 
-# YouTube system: tasks, web app, and manual check function
+# YouTube system
 start_youtube_tasks, build_youtube_web_app, manual_check = youtube.setup_youtube(bot)
 bot.youtube_manual_check = manual_check
 
@@ -33,22 +33,18 @@ _synced = False
 
 
 @bot.tree.error
-async def on_app_command_error(
-    interaction: discord.Interaction, error: app_commands.AppCommandError
-):
-    print(
-        f"Slash command error in /{interaction.command.name if interaction.command else '?'}: {error}"
-    )
+async def on_app_command_error(interaction, error):
+    print(f"Slash command error: {error}")
     traceback.print_exception(type(error), error, error.__traceback__)
 
-    message = f"⚠️ Something went wrong running this command:\n```{error}```"
+    msg = f"⚠️ Something went wrong:\n```{error}```"
     try:
         if interaction.response.is_done():
-            await interaction.followup.send(message, ephemeral=True)
+            await interaction.followup.send(msg, ephemeral=True)
         else:
-            await interaction.response.send_message(message, ephemeral=True)
-    except Exception as inner:
-        print(f"Also failed to report the error to Discord: {inner}")
+            await interaction.response.send_message(msg, ephemeral=True)
+    except:
+        pass
 
 
 @bot.tree.command(
@@ -56,9 +52,8 @@ async def on_app_command_error(
     description="Force the YouTube system to check for new videos immediately.",
 )
 @app_commands.default_permissions(administrator=True)
-async def check_now(interaction: discord.Interaction):
+async def check_now(interaction):
     await interaction.response.defer(ephemeral=True)
-
     try:
         await bot.youtube_manual_check()
         await interaction.followup.send("YouTube check completed.")
@@ -77,24 +72,24 @@ async def on_ready():
 
     if not _synced:
         if GUILD_ID:
-            guild_obj = discord.Object(id=int(GUILD_ID))
-            bot.tree.copy_global_to(guild=guild_obj)
-            await bot.tree.sync(guild=guild_obj)
+            guild = discord.Object(id=int(GUILD_ID))
+            bot.tree.copy_global_to(guild=guild)
+            await bot.tree.sync(guild=guild)
             print(f"Slash commands synced instantly to guild {GUILD_ID}")
         else:
             await bot.tree.sync()
-            print("Slash commands synced globally (may take time to appear)")
+            print("Slash commands synced globally.")
         _synced = True
 
 
 @bot.event
-async def on_message(message: discord.Message):
+async def on_message(message):
     await leveling.handle_message_xp(message, bot)
     await bot.process_commands(message)
 
 
 @bot.event
-async def on_member_join(member: discord.Member):
+async def on_member_join(member):
     await invites.handle_member_join(member, bot)
 
 
