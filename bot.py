@@ -100,7 +100,6 @@ async def yt_stats(interaction: discord.Interaction):
         stats = info.get("statistics", {})
 
         # Basic info
-        title = snippet.get("title", "Unknown")
         created = snippet.get("publishedAt", "Unknown")
 
         # Stats
@@ -112,14 +111,14 @@ async def yt_stats(interaction: discord.Interaction):
         pfp = snippet.get("thumbnails", {}).get("high", {}).get("url")
 
         embed = discord.Embed(
-            title=f"YouTube Channel Stats — {title}",
+            title=f"YouTube Channel Stats — Clashy Vr",
             color=discord.Color.red()
         )
 
         embed.add_field(name="👥 Subscribers", value=f"{int(subs):,}", inline=True)
         embed.add_field(name="▶️ Views", value=f"{int(views):,}", inline=True)
         embed.add_field(name="🎬 Videos", value=f"{int(videos):,}", inline=True)
-        embed.add_field(name="📅 Created", value=created, inline=False)
+        embed.add_field(name="📅 Created", value="12/25/2025", inline=False)
         embed.add_field(
             name="🔗 Channel URL",
             value=f" → [Jump to Clashy Vr's Channel](https://www.youtube.com/channel/{channel_id})",
