@@ -10,15 +10,19 @@ Usage:
                                               re-announce every existing video
                                               on the channel next check!)
 
-Run this WHILE bot.py is stopped, then start bot.py again (with
-CHECK_INTERVAL_MINUTES=1 if you want a fast test loop).
+This version ALSO notifies the running bot so you do NOT need to restart it.
 """
 
 import json
 import os
 import sys
+import asyncio
+import aiohttp
 
 SEEN_FILE = "seen_videos.json"
+
+# PUBLIC_URL must match the bot's PUBLIC_URL environment variable
+BOT_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")
 
 
 def load_seen():
@@ -33,9 +37,25 @@ def save_seen(seen):
         json.dump(list(seen), f)
 
 
+async def notify_bot(video_id):
+    """Tell the running bot to clear the in-memory seen cache."""
+    if not BOT_URL:
+        print("PUBLIC_URL not set — cannot notify running bot.")
+        return
+
+    url = f"{BOT_URL}/clear-seen"
+    async with aiohttp.ClientSession() as session:
+        try:
+            await session.post(url, json={"video_id": video_id})
+            print("Notified running bot to clear in-memory cache.")
+        except Exception as e:
+            print(f"Failed to notify bot: {e}")
+
+
 def main():
     seen = load_seen()
 
+    # No args → list seen videos
     if len(sys.argv) == 1:
         print(f"Currently marked as seen ({len(seen)} videos):")
         for vid in seen:
@@ -46,17 +66,21 @@ def main():
 
     arg = sys.argv[1]
 
+    # Clear ALL
     if arg == "--all":
         save_seen(set())
-        print(f"Cleared all {len(seen)} seen video(s). "
-              "Bot will treat them all as new on next check!")
+        print(f"Cleared all {len(seen)} seen video(s).")
+        asyncio.run(notify_bot(None))
+        return
+
+    # Clear ONE
+    if arg in seen:
+        seen.discard(arg)
+        save_seen(seen)
+        print(f"Forgot video {arg}.")
+        asyncio.run(notify_bot(arg))
     else:
-        if arg in seen:
-            seen.discard(arg)
-            save_seen(seen)
-            print(f"Forgot video {arg}. Bot will re-announce it on next check.")
-        else:
-            print(f"Video {arg} wasn't in the seen list. Nothing changed.")
+        print(f"Video {arg} wasn't in the seen list. Nothing changed.")
 
 
 if __name__ == "__main__":
