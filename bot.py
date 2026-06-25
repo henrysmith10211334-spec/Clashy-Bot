@@ -1,6 +1,7 @@
 import os
 import asyncio
 import traceback
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -13,17 +14,18 @@ import youtube
 
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 PORT = int(os.environ.get("PORT", "8080"))
-GUILD_ID = os.environ.get("GUILD_ID")  # optional — set for instant slash command sync while testing
+GUILD_ID = os.environ.get("GUILD_ID")
 
 intents = discord.Intents.default()
-intents.members = True  # required for invite tracking — also enable "Server Members Intent" in the Dev Portal
+intents.members = True  # needed for invite tracking
 
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
+# Attach other systems
 leveling.setup_leveling_commands(bot)
 invites.setup_invite_commands(bot)
 
-# UPDATED: now receives manual_check_for_new_video
+# YouTube system: tasks, web app, and manual check function
 start_youtube_tasks, build_youtube_web_app, manual_check = youtube.setup_youtube(bot)
 bot.youtube_manual_check = manual_check
 
@@ -31,8 +33,12 @@ _synced = False
 
 
 @bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    print(f"Slash command error in /{interaction.command.name if interaction.command else '?'}: {error}")
+async def on_app_command_error(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+):
+    print(
+        f"Slash command error in /{interaction.command.name if interaction.command else '?'}: {error}"
+    )
     traceback.print_exception(type(error), error, error.__traceback__)
 
     message = f"⚠️ Something went wrong running this command:\n```{error}```"
@@ -43,6 +49,21 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
             await interaction.response.send_message(message, ephemeral=True)
     except Exception as inner:
         print(f"Also failed to report the error to Discord: {inner}")
+
+
+@bot.tree.command(
+    name="check-now",
+    description="Force the YouTube system to check for new videos immediately.",
+)
+@app_commands.default_permissions(administrator=True)
+async def check_now(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        await bot.youtube_manual_check()
+        await interaction.followup.send("YouTube check completed.")
+    except Exception as e:
+        await interaction.followup.send(f"Error: {e}")
 
 
 @bot.event
@@ -62,7 +83,7 @@ async def on_ready():
             print(f"Slash commands synced instantly to guild {GUILD_ID}")
         else:
             await bot.tree.sync()
-            print("Slash commands synced globally (can take up to an hour to show up)")
+            print("Slash commands synced globally (may take time to appear)")
         _synced = True
 
 
