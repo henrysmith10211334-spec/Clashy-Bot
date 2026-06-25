@@ -22,18 +22,16 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 leveling.setup_leveling_commands(bot)
 invites.setup_invite_commands(bot)
-start_youtube_tasks, build_youtube_web_app = youtube.setup_youtube(bot)
+
+# UPDATED: now receives manual_check_for_new_video
+start_youtube_tasks, build_youtube_web_app, manual_check = youtube.setup_youtube(bot)
+bot.youtube_manual_check = manual_check
 
 _synced = False
 
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    """
-    Surfaces the real error directly in Discord (ephemeral) instead of just
-    'The application did not respond' — so you don't need to dig through
-    Railway logs to see what broke.
-    """
     print(f"Slash command error in /{interaction.command.name if interaction.command else '?'}: {error}")
     traceback.print_exception(type(error), error, error.__traceback__)
 
