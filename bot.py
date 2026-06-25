@@ -122,7 +122,7 @@ async def yt_stats(interaction: discord.Interaction):
         embed.add_field(name="📅 Created", value=created, inline=False)
         embed.add_field(
             name="🔗 Channel URL",
-            value=f"https://www.youtube.com/channel/{channel_id}",
+            value=f"[Jump to Clashy Vr's Channel](https://www.youtube.com/channel/{channel_id})",
             inline=False
         )
 
