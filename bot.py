@@ -65,9 +65,8 @@ async def check_now(interaction):
 #-------------------------------------------------------------
 @bot.tree.command(
     name="yt-stats",
-    description="Show full YouTube channel statistics for the configured channel."
+    description="Show YouTube channel statistics for the configured channel."
 )
-@app_commands.default_permissions(administrator=True)
 async def yt_stats(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
@@ -85,7 +84,7 @@ async def yt_stats(interaction: discord.Interaction):
         # YouTube Data API request
         url = (
             "https://www.googleapis.com/youtube/v3/channels"
-            f"?part=snippet,brandingSettings,statistics&id={channel_id}&key={api_key}"
+            f"?part=snippet,statistics&id={channel_id}&key={api_key}"
         )
 
         async with aiohttp.ClientSession() as session:
@@ -99,11 +98,9 @@ async def yt_stats(interaction: discord.Interaction):
         info = data["items"][0]
         snippet = info.get("snippet", {})
         stats = info.get("statistics", {})
-        branding = info.get("brandingSettings", {})
 
         # Basic info
         title = snippet.get("title", "Unknown")
-        description = snippet.get("description", "No description available.")
         created = snippet.get("publishedAt", "Unknown")
 
         # Stats
@@ -111,23 +108,17 @@ async def yt_stats(interaction: discord.Interaction):
         views = stats.get("viewCount", "0")
         videos = stats.get("videoCount", "0")
 
-        # Images
+        # Channel profile picture
         pfp = snippet.get("thumbnails", {}).get("high", {}).get("url")
-        banner = branding.get("image", {}).get("bannerExternalUrl")
-
-        # Shorten description
-        if len(description) > 300:
-            description = description[:300] + "..."
 
         embed = discord.Embed(
             title=f"YouTube Channel Stats — {title}",
-            description=description,
             color=discord.Color.red()
         )
 
         embed.add_field(name="👥 Subscribers", value=f"{int(subs):,}", inline=True)
-        embed.add_field(name="▶️ Total Views", value=f"{int(views):,}", inline=True)
-        embed.add_field(name="🎬 Total Videos", value=f"{int(videos):,}", inline=True)
+        embed.add_field(name="▶️ Views", value=f"{int(views):,}", inline=True)
+        embed.add_field(name="🎬 Videos", value=f"{int(videos):,}", inline=True)
         embed.add_field(name="📅 Created", value=created, inline=False)
         embed.add_field(
             name="🔗 Channel URL",
@@ -139,18 +130,12 @@ async def yt_stats(interaction: discord.Interaction):
         if pfp:
             embed.set_thumbnail(url=pfp)
 
-        # Banner (big image)
-        if banner:
-            embed.set_image(url=banner)
-
         embed.set_footer(text="YouTube System • Channel Stats")
 
         await interaction.followup.send(embed=embed)
 
     except Exception as e:
-        await interaction.followup.send(f"Error: {e}", ephemeral=True)
-
-
+        await interaction.followup.send(f"Error: {e}", ephemeral=False)
 @bot.event
 async def on_ready():
     global _synced
