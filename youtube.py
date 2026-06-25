@@ -7,6 +7,7 @@ so it can attach itself to the shared bot instance created in bot.py.
 import os
 import json
 import re
+import asyncio
 import discord
 import feedparser
 import aiohttp
@@ -23,8 +24,7 @@ CHECK_INTERVAL_MINUTES = int(os.environ.get("CHECK_INTERVAL_MINUTES", "15"))
 LIVE_CHECK_INTERVAL_MINUTES = int(os.environ.get("LIVE_CHECK_INTERVAL_MINUTES", "2"))
 RESUBSCRIBE_INTERVAL_HOURS = int(os.environ.get("RESUBSCRIBE_INTERVAL_HOURS", "96"))  # ~4 days; lease is 5
  
-PING_ROLE_ID = os.environ.get("PING_ROLE_ID", "1518806702886223932")
-PING_MESSAGE = f"-------- <@&{PING_ROLE_ID}> --------"
+PING_MESSAGE = "-------- @here --------"
  
 CREATOR_NAME = os.environ.get("CREATOR_NAME", "Clashy VR")
 EMBED_COLOR = discord.Color(0xDDA731)  # matches the reference embed's gold accent
@@ -80,19 +80,30 @@ def extract_video_id(url):
 # WebSub push) YouTube sometimes hasn't generated the bigger sizes yet, so we
 # check what's actually available rather than guessing one fixed filename.
 THUMBNAIL_CANDIDATES = ["maxresdefault.jpg", "sddefault.jpg", "hqdefault.jpg", "mqdefault.jpg", "default.jpg"]
+THUMBNAIL_RETRY_ATTEMPTS = 4
+THUMBNAIL_RETRY_DELAY_SECONDS = 4
  
  
 async def resolve_thumbnail_url(video_id):
+    """
+    Checks which thumbnail size actually exists yet, retrying with a short
+    delay — WebSub can fire so fast that YouTube hasn't finished generating
+    ANY thumbnail size (even the lowest quality) at the moment we first check.
+    """
     async with aiohttp.ClientSession() as session:
-        for filename in THUMBNAIL_CANDIDATES:
-            url = f"https://i.ytimg.com/vi/{video_id}/{filename}"
-            try:
-                async with session.head(url, timeout=aiohttp.ClientTimeout(total=3)) as resp:
-                    if resp.status == 200:
-                        return url
-            except Exception:
-                continue
-    # Fallback guess if every HEAD check failed (e.g. a transient network blip)
+        for attempt in range(THUMBNAIL_RETRY_ATTEMPTS):
+            for filename in THUMBNAIL_CANDIDATES:
+                url = f"https://i.ytimg.com/vi/{video_id}/{filename}"
+                try:
+                    async with session.head(url, timeout=aiohttp.ClientTimeout(total=3)) as resp:
+                        if resp.status == 200:
+                            return url
+                except Exception:
+                    continue
+            if attempt < THUMBNAIL_RETRY_ATTEMPTS - 1:
+                await asyncio.sleep(THUMBNAIL_RETRY_DELAY_SECONDS)
+ 
+    # Fallback guess if every attempt failed (e.g. a transient network blip)
     return f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
  
  
