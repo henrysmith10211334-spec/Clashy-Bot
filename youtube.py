@@ -71,7 +71,7 @@ live_state = load_live_state()
 
 
 # -----------------------------
-# Thumbnail resolution
+# Thumbnail resolution (patched)
 # -----------------------------
 THUMBNAIL_ORDER = [
     "maxresdefault.jpg",
@@ -84,14 +84,20 @@ THUMBNAIL_ORDER = [
 
 async def resolve_thumbnail(video_id):
     async with aiohttp.ClientSession() as session:
-        for filename in THUMBNAIL_ORDER:
-            url = f"https://i.ytimg.com/vi/{video_id}/{filename}"
-            try:
-                async with session.head(url) as resp:
-                    if resp.status == 200:
-                        return url
-            except:
-                pass
+        # Retry for ~18 seconds total
+        for attempt in range(6):
+            for filename in THUMBNAIL_ORDER:
+                url = f"https://i.ytimg.com/vi/{video_id}/{filename}"
+                try:
+                    async with session.head(url) as resp:
+                        if resp.status == 200:
+                            return url
+                except:
+                    pass
+
+            await asyncio.sleep(3)
+
+    # fallback
     return f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
 
 
@@ -161,7 +167,7 @@ async def fetch_live_video():
 def setup_youtube(bot):
 
     # -------------------------
-    # Announce new upload
+    # Announce new upload (patched)
     # -------------------------
     async def announce_upload(entry):
         channel = bot.get_channel(CHANNEL_ID)
@@ -171,7 +177,14 @@ def setup_youtube(bot):
 
         video_url = entry.link
         video_id = entry.get("yt_videoid")
-        thumb = await resolve_thumbnail(video_id)
+
+        # Thumbnail retry loop (patch #2)
+        thumb = None
+        for _ in range(5):  # ~15 seconds
+            thumb = await resolve_thumbnail(video_id)
+            if thumb:
+                break
+            await asyncio.sleep(3)
 
         embed = discord.Embed(
             description=f"**{CREATOR_NAME}** has posted a new video\n\n[Jump to Clashy's new video!]({video_url})",
