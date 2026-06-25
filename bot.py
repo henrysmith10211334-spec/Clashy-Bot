@@ -60,6 +60,96 @@ async def check_now(interaction):
     except Exception as e:
         await interaction.followup.send(f"Error: {e}")
 
+# ------------------------------------------------------------
+# YT Channel Command
+#-------------------------------------------------------------
+@bot.tree.command(
+    name="yt-stats",
+    description="Show full YouTube channel statistics for the configured channel."
+)
+@app_commands.default_permissions(administrator=True)
+async def yt_stats(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        import aiohttp
+        import os
+
+        channel_id = os.environ.get("YOUTUBE_CHANNEL_ID")
+        api_key = os.environ.get("YOUTUBE_API_KEY")
+
+        if not api_key:
+            await interaction.followup.send("❌ Missing YOUTUBE_API_KEY environment variable.")
+            return
+
+        # YouTube Data API request
+        url = (
+            "https://www.googleapis.com/youtube/v3/channels"
+            f"?part=snippet,brandingSettings,statistics&id={channel_id}&key={api_key}"
+        )
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                data = await resp.json()
+
+        if "items" not in data or not data["items"]:
+            await interaction.followup.send("❌ Could not fetch channel stats.")
+            return
+
+        info = data["items"][0]
+        snippet = info.get("snippet", {})
+        stats = info.get("statistics", {})
+        branding = info.get("brandingSettings", {})
+
+        # Basic info
+        title = snippet.get("title", "Unknown")
+        description = snippet.get("description", "No description available.")
+        created = snippet.get("publishedAt", "Unknown")
+
+        # Stats
+        subs = stats.get("subscriberCount", "0")
+        views = stats.get("viewCount", "0")
+        videos = stats.get("videoCount", "0")
+
+        # Images
+        pfp = snippet.get("thumbnails", {}).get("high", {}).get("url")
+        banner = branding.get("image", {}).get("bannerExternalUrl")
+
+        # Shorten description
+        if len(description) > 300:
+            description = description[:300] + "..."
+
+        embed = discord.Embed(
+            title=f"YouTube Channel Stats — {title}",
+            description=description,
+            color=discord.Color.red()
+        )
+
+        embed.add_field(name="👥 Subscribers", value=f"{int(subs):,}", inline=True)
+        embed.add_field(name="▶️ Total Views", value=f"{int(views):,}", inline=True)
+        embed.add_field(name="🎬 Total Videos", value=f"{int(videos):,}", inline=True)
+        embed.add_field(name="📅 Created", value=created, inline=False)
+        embed.add_field(
+            name="🔗 Channel URL",
+            value=f"https://www.youtube.com/channel/{channel_id}",
+            inline=False
+        )
+
+        # Channel PFP (top right)
+        if pfp:
+            embed.set_thumbnail(url=pfp)
+
+        # Banner (big image)
+        if banner:
+            embed.set_image(url=banner)
+
+        embed.set_footer(text="YouTube System • Channel Stats")
+
+        await interaction.followup.send(embed=embed)
+
+    except Exception as e:
+        await interaction.followup.send(f"Error: {e}", ephemeral=True)
+
 
 @bot.event
 async def on_ready():
