@@ -68,7 +68,7 @@ async def check_now(interaction):
     description="Show YouTube channel statistics for the configured channel."
 )
 async def yt_stats(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
 
     try:
         import aiohttp
@@ -135,7 +135,7 @@ async def yt_stats(interaction: discord.Interaction):
         await interaction.followup.send(embed=embed)
 
     except Exception as e:
-        await interaction.followup.send(f"Error: {e}", ephemeral=False)
+        await interaction.followup.send(f"Error: {e}", ephemeral=True)
 @bot.event
 async def on_ready():
     global _synced
